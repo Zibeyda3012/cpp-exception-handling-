@@ -1,0 +1,510 @@
+#include <iostream>
+#include <windows.h>
+#include<string>
+#include <ctime>
+#pragma warning (disable:4996)
+
+using namespace std;
+
+    //eger bu username istifadechi yoxdursa error atsin
+	//eger username varsa amma password yanlishdirsa error atsin
+    //Eger istifadechi varsa hemen username de throw DatabaseException
+	//Eger username xarakter sayi 6 dan kichikdirse InvalidArgumentException
+	//Eger username ilk herf kichikdirse InvalidArgumentException
+	//Eger password xarakter sayi 6 dan kichikdirse InvalidArgumentException
+	//Eger name xarakter sayi 4 dan kichikdirse InvalidArgumentException
+	//Eger surname xarakter sayi 4 dan kichikdirse InvalidArgumentException
+
+
+class Exception :public exception 
+{
+	string _text;
+	int _line;
+	string _time;
+	string _file;
+
+public:
+	Exception(string text="NULL error",int line=0,string time="",string file=" "):exception(text.c_str())
+	{
+		_text = text;
+		_line = line;
+		_time = time;
+		_file = file;
+
+		_text = "message: "+_text + "\nfile: " + _file + "\nline: " + to_string(_line) + "\ntime: " + _time;
+	}
+
+	char const* what() const override
+	{
+		return _text.c_str();
+	}
+
+
+}; 
+
+class DatabaseException :public Exception
+{
+public: 
+	DatabaseException(string message = "Database error", int line = 0, string time="", string file="") :Exception(message, line, time, file)
+	{}
+
+};
+
+class InvalidArgumentException :public Exception
+{
+public:
+
+	InvalidArgumentException(string message = "Invalid Argument", int line = 0,string time="", string file="") :Exception(message, line, time, file)
+	{}
+};
+
+
+class User {
+	string _username;
+	string _password;
+	string _name;
+	string _surname;
+
+public:
+
+	User(string name, string surname, string username, string password)
+	{
+		SetName(name);
+		SetSurname(surname);
+		SetUsername(username);
+		SetPassword(password);
+	}
+
+	User(const User& other)
+	{
+		this->_name = other._name;
+		this->_surname = other._surname;
+		this->_username = other._username;
+		this->_password = other._password;
+
+	}
+
+	void SetName(string name)
+	{
+		int len = name.size();
+		time_t now = time(0);
+		char* dt=ctime(&now);
+
+		if (len < 4) throw InvalidArgumentException("length must be min 4 ",__LINE__,dt,__FILE__);
+
+		for (size_t i = 0; i < len; i++)
+			if (!((name[i] >= 65 && name[i] <= 90) || (name[i] >= 97 && name[i] <= 122)))
+				throw InvalidArgumentException("name can only contain letters!!!", __LINE__, dt, __FILE__);
+
+		_name = name;
+
+
+	}
+
+	void SetSurname(string surname)
+	{
+		int len = surname.size();
+		time_t now = time(0);
+		char* dt = ctime(&now);
+
+		if (len < 4) throw InvalidArgumentException("surname must contain at least 4 sy,bols", __LINE__, dt, __FILE__);
+
+		for (size_t i = 0; i < len; i++)
+			if (!((surname[i] >= 65 && surname[i] <= 90) || (surname[i] >= 97 && surname[i] <= 122)))
+				throw InvalidArgumentException("surname can only contain letters!!!", __LINE__, dt, __FILE__);
+
+		_surname = surname;
+	}
+
+	void SetUsername(string username)
+	{
+		int len = username.size();
+		time_t now = time(0);
+		char* dt = ctime(&now);
+
+		if (len < 6) throw InvalidArgumentException("username must contain at least 6 symbols", __LINE__, dt, __FILE__);
+		if (!(username.front() >= 65 && username.front() <= 90))
+			throw InvalidArgumentException("username must begin with uppercase letter", __LINE__, dt, __FILE__);
+
+		_username = username;
+
+	}
+
+	void SetPassword(string password)
+	{
+		time_t now = time(0);
+		char* dt = ctime(&now);
+		if (password.size() < 6) throw InvalidArgumentException("password must contain at least 6 symbols", __LINE__, dt, __FILE__);
+		_password = password;
+	}
+
+	string GetName()const { return _name; }
+	string GetSurname() const { return _surname; }
+	string GetUsername() const { return _username; }
+	string GetPassword() const { return _password; }
+
+
+	void show() const
+	{
+		cout << endl;
+		cout << "Name: " << _name << endl;
+		cout << "Surname: " << _surname << endl;
+		cout << "Username: " << _username << endl;
+		cout << "Password: " << _password << endl;
+	}
+};
+
+class Database {
+	User** users;
+	int user_count = 0;
+public:
+
+	Database()
+	{
+		users = nullptr;
+		user_count = 0;
+	}
+
+	void addUser(const User& user)
+	{
+		if (this->user_count == 0)
+		{
+			this->users = new User * [1];
+			//users[0] = new User(user.GetName(),user.GetSurname(), user.GetUsername(), user.GetPassword());
+			users[0] = new User(user);
+			user_count++;
+		}
+		else
+		{
+			User** nUsers = new User * [user_count + 1];
+			for (size_t i = 0; i < user_count; i++)
+			{
+				nUsers[i] = users[i];
+			}
+			nUsers[user_count] = new User(user);
+			user_count++;
+
+			delete[] users;
+			users = nUsers;
+		}
+	}
+
+	bool CheckUser(string username)
+	{
+		for (size_t i = 0; i < user_count; i++)
+			if (users[i]->GetUsername() == username)
+				return true;
+
+		return false;
+	}
+
+	User& getUserByUsername(string username)
+	{
+		time_t now = time(0);
+		char* dt = ctime(&now);
+		for (size_t i = 0; i < user_count; i++)
+			if (CheckUser(username))
+				return *users[i];
+
+		DatabaseException("user not found", __LINE__, dt, __FILE__);
+
+	}
+
+	void printUserByUsername(string username)
+	{
+		time_t now = time(0);
+		char* dt = ctime(&now);
+		for (size_t i = 0; i < user_count; i++)
+			if (CheckUser(username))
+				users[i]->show();
+
+		DatabaseException("user not found", __LINE__, dt, __FILE__);
+	}
+
+	void updateUser(User& olduser, const User& newuser)
+	{
+		time_t now = time(0);
+		char* dt = ctime(&now);
+		if (CheckUser(olduser.GetUsername()))
+			olduser = newuser;
+		else
+			DatabaseException("user not found", __LINE__, dt, __FILE__);
+
+	}
+
+	void printAllUsers()
+	{
+		for (size_t i = 0; i < user_count; i++)
+			users[i]->show();
+
+	}
+
+	Database& operator=(const Database& other)
+	{
+		for (size_t i = 0; i < user_count ; i++)
+		{
+			delete users[i];
+			users[i] = nullptr;
+		}
+		delete users;
+
+		this->user_count = other.user_count;
+		this->users = new User * [user_count];
+
+		for (size_t i = 0; i < user_count; i++)
+			users[i] = new User(*other.users[i]);
+
+		return *this;
+	}
+
+	~Database()
+	{
+		for (size_t i = 0; i < user_count; i++)
+		{
+			delete users[i];
+			users[i] = nullptr;
+		}
+
+		delete[] users;
+	}
+
+
+};
+
+class Registration {
+	Database* _database;
+public:
+	Registration(Database* database)
+	{
+		_database = database;
+	}
+
+	void signIn(string username, string password)
+	{
+		time_t now = time(0);
+		char* dt = ctime(&now);
+		if (_database->CheckUser(username))
+		{
+			if (_database->getUserByUsername(username).GetPassword() == password)
+				cout << "you are logged in" << endl;
+			else
+				InvalidArgumentException("incorrect password", __LINE__, dt, __FILE__);
+		}
+		else
+			DatabaseException("user not found", __LINE__, dt, __FILE__);
+
+	}
+
+	void signUp(string username, string password, string name, string surname)
+	{
+		time_t now = time(0);
+		char* dt = ctime(&now);
+		if (_database->CheckUser(username))
+			DatabaseException("this username already exists", __LINE__, dt, __FILE__);
+		else
+			_database->addUser(User(name, surname, username, password));
+		
+		
+	}
+};
+
+
+class System {
+public:
+	static void printMenu()
+	{
+		cout << "=====================" << endl;
+		cout << "1 => Show All users" << endl;
+		cout << "2 => Sign in" << endl;
+		cout << "3 => Sign up" << endl;
+		cout << "0 => Exit" << endl;
+		cout << "=====================" << endl;
+
+	}
+
+	static void Control() {
+		Database db;
+		Registration twitter(&db);
+
+		while (true)
+		{
+			printMenu();
+			int choice;
+			cout << endl << "enter your choice: ";
+			cin >> choice;
+
+			if (choice == 0)
+			{
+				system("cls");
+				cout << "bye bye..." << endl;
+				return;
+			}
+
+			else if (choice == 1)
+			{
+				system("cls");
+				db.printAllUsers();
+			}
+
+			else if (choice == 2)
+			{
+				system("cls");
+				cin.ignore();
+				string username;
+				string password;
+
+				try
+				{
+					cout << "enter username: ";
+					cin >> username;
+					if (db.CheckUser(username))
+					{
+						try
+						{
+							cout << "enter password: ";
+							cin >> password;
+							twitter.signIn(username, password);
+						}
+						catch (InvalidArgumentException ex)
+						{
+							cout << ex.what() << endl;
+						}
+
+						catch (Exception ex)
+						{
+							cout << ex.what() << endl;
+						}
+
+						catch (exception ex)
+						{
+							cout << ex.what() << endl;
+						}
+
+						catch (...)
+						{
+							cout << "Error happened" << endl;
+						}
+					}
+					else
+						throw DatabaseException("username not found!!!");
+				}
+				catch (DatabaseException ex)
+				{
+					cout << ex.what() << endl;
+				}
+
+				catch (InvalidArgumentException ex)
+				{
+					cout << ex.what() << endl;
+				}
+
+				catch (Exception ex)
+				{
+					cout << ex.what() << endl;
+				}
+
+				catch (exception ex)
+				{
+					cout << ex.what() << endl;
+				}
+
+				catch (...)
+				{
+					cout << "Error happened" << endl;
+				}
+			}
+
+			else if (choice == 3)
+			{
+				system("cls");
+				cin.ignore();
+				string username, name, surname;
+				string password;
+
+				try
+				{
+					cout << "enter name: ";
+					cin >> name;
+					cout << "enter surname: ";
+					cin >> surname;
+
+					cout << "enter username: ";
+					cin >> username;
+
+					if (db.CheckUser(username))
+						throw DatabaseException("this username already exists");
+
+					else
+					{
+						try
+						{
+							cout << "enter password: ";
+							cin >> password;
+							twitter.signUp(username, password, name, surname);
+						}
+
+						catch (InvalidArgumentException ex)
+						{
+							cout << ex.what() << endl;
+						}
+
+						catch (Exception ex)
+						{
+							cout << ex.what() << endl;
+						}
+
+						catch (exception ex)
+						{
+							cout << ex.what() << endl;
+						}
+
+						catch (...)
+						{
+							cout << "Error happened" << endl;
+						}
+					}
+				}
+				catch (DatabaseException ex)
+				{
+					cout << ex.what() << endl;
+				}
+
+				catch (InvalidArgumentException ex)
+				{
+					cout << ex.what() << endl;
+				}
+
+				catch (Exception ex)
+				{
+					cout << ex.what() << endl;
+				}
+
+				catch (exception ex)
+				{
+					cout << ex.what() << endl;
+				}
+
+				catch (...)
+				{
+					cout << "Error happened" << endl;
+				}
+			}
+
+			else
+			{
+				system("cls");
+				cout << "incorrect choice" << endl;
+				return;
+			}
+
+
+		}
+	}
+
+};
+
+void main() {
+	System::Control();
+	//system("pause");
+
+}
